@@ -50,7 +50,7 @@ main{display:block;padding:8px 0 0;overflow:visible;}
   margin:6px auto;
   color:inherit;
   text-align:center;
-  min-width:80px;
+  min-width:99px;
   box-shadow:var(--shadow);
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'><path fill='%23ffd700' d='M0 0l5 6 5-6z'/></svg>");
   background-repeat:no-repeat;
@@ -186,7 +186,7 @@ const TZ='Asia/Taipei';
 function ymdToSerial(y,m,d){ return Math.floor(Date.UTC(y,m-1,d)/86400000)+25569; }
 
 /* ===== mm/dd 文字 ===== */
-function mdLabel(y,m,d){ const mm=String(m).padStart(2,'0'), dd=String(d).padStart(2,'0'); return `${mm}/${dd}`; }
+function mdLabel(y,m,d){ const mm=String(m).padStart(2,'0'), dd=String(d).padStart(2,'0'); return `  ${mm}/${dd}`; }
 
 /* ===== 時鐘（台北時間）===== */
 function tpeParts(){
