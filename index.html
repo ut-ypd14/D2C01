@@ -315,7 +315,7 @@ function checkCutoff(){
    if(!mt) return;
    const mins = (+mt[3]) * 60 + (+mt[4]);
    if (mins > cuton && lock_st === 1) fillDateSelect();
-   if (mins > cutoff && lock_st === 0) {
+   if (mins > cutoff && mins < cuton && lock_st === 0) {
      const sel   = document.getElementById('selDate');
      if (sel.selectedIndex === 0) sel.selectedIndex = 1;
      sel.options[0].disabled = true;
