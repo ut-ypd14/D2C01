@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<script src="./config.js"></script>
+<script>
+const uid = localStorage.getItem('user_id');
+if (uid) closeOrN(); 
+function closeOrN() {
+  window.close();
+  setTimeout(() => {
+    if (!window.closed) {
+      if (history.length > 1) history.back();
+      else location.href = 'index.html';
+    }
+  }, 120);
+}
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Google</title>
+<style>
+:root{
+  --bg:#0a0a0f;
+  --panel:#111827;
+  --accent:#00fff0;
+  --text:#e5e7eb;
+  --sub:#9ca3af; }
+
+html,body{ text-size-adjust:100%;
+  -webkit-text-size-adjust:100%;
+  overflow-x:hidden;
+  overflow-y:hidden;
+  overscroll-behavior:none;
+  margin:0; background:#000;
+  color:var(--text);
+  font-family:system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;
+  display:flex;justify-content:center;
+  align-items:flex-start; min-height:100svh; } *,*::before,*::after{box-sizing:border-box}
+@supports (-webkit-touch-callout:none){body{position:fixed;inset:0;width:100%; }}
+
+.container{
+margin-top:11svh; width:90%;
+max-width:380px;min-width:240px;
+background:#000;border-radius:20px;
+padding:32px 24px;text-align:center;
+animation:glow 1.2s infinite ease-in-out alternate;
+box-shadow:0 0 20px rgba(0,255,240,.2); }
+@keyframes glow{
+  0%{box-shadow:0 0 12px rgba(0,255,240,.2);}
+  100%{box-shadow:0 0 24px rgba(0,255,240,.6); } }
+
+h1{font-size:20px;letter-spacing:.1em;margin-bottom:24px;color:#b00000;text-shadow:0 0 8px #5A0000;}
+
+input{
+  width:80%;max-width:240px;height:44px;
+  margin:8px 0;padding:0 10px;
+  border-radius:8px;
+  border:1px solid #00fff0;
+  background:#000;
+  color:var(--text);
+  font-size:16px;text-align:center;
+  box-shadow:0 0 10px rgba(0,255,240,.15) inset;
+}
+input:focus{
+  outline:none;
+  box-shadow:0 0 8px rgba(0,255,240,.6);
+}
+
+button{
+  width:120px;height:44px;margin-top:20px;
+  border-radius:10px;
+  border:1px solid var(--accent);
+  background:#000;
+  color:var(--accent);
+  font-weight:700;letter-spacing:.08em;
+  cursor:pointer;
+  transition:all .25s ease;
+  box-shadow:0 0 12px rgba(0,255,240,.2) inset,0 0 8px rgba(0,255,240,.3); }
+
+button:hover{
+  color:#fff;
+  background:radial-gradient(circle at center,#022,#000);
+  box-shadow:0 0 18px rgba(0,255,240,.6),
+             0 0 10px rgba(0,255,240,.4) inset; transform:translateY(-1px); }
+
+button:active{
+  transform:translateY(1px);
+  box-shadow:0 0 8px rgba(0,255,240,.4) inset; }
+
+.overlay{
+  position:fixed;inset:0;display:none;
+  background:rgba(0,0,0,.5); align-items:center;justify-content:center;
+  z-index:99; }
+.spinner{
+  width:50px;height:50px;border-radius:50%;
+  border:4px solid rgba(255,255,255,.3);
+  border-top-color:var(--accent);
+  animation:spin 1s linear infinite; }
+@keyframes spin{to{transform:rotate(360deg);}}
+.msg{margin-top:12px;font-size:14px;color:var(--sub); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>組 織 認 證 入 口</h1>
+  <form autocomplete="off">
+    <input id="uid" name="uid"
+         placeholder="輸入＀５碼＀ＩＤ" maxlength="5" type="text" autocomplete="off" spellcheck="false"
+         autocapitalize="off" autocorrect="off" inputmode="text">
+    <br>
+    <input id="pwd" name="auth"
+         placeholder="enter the private key" type="text"
+         minlength="4" maxlength="10"
+         autocomplete="off" spellcheck="false"
+         autocapitalize="off" autocorrect="off">
+    <br>
+    <button id="loginBtn" type="button"> Login.. </button>
+  </form>
+  <br>
+  <div class="msg" id="msg"></div>
+</div>
+  <div class="overlay" id="overlay"><div class="spinner"></div></div>
+
+  <audio id="bgm" src="./mus/clock03.mp3" preload="auto"></audio>
+<script>
+/* 基本環境檢查 */
+bgm.src = './mus/login2.mp3';
+bgm.load();
+const overlay=document.getElementById('overlay');
+const msg=document.getElementById('msg');
+function showOverlay(on){overlay.style.display=on?'flex':'none';}
+function saveUser(u){localStorage.setItem('user_id',u);}
+
+/* 帳號即時轉大寫 */
+const uidEl=document.getElementById('uid');
+uidEl.addEventListener('input',()=>{
+  uidEl.value=uidEl.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+});
+
+/* 驗證邏輯 */
+let verifying = false;
+async function verify(){
+  if (verifying) return;
+
+  const $uid = document.getElementById('uid');
+  const $pwd = document.getElementById('pwd');
+  const uid = $uid.value.trim().toUpperCase();
+  const pwd = $pwd.value.trim();
+
+  if (!/^[A-Z0-9]{5}$/.test(uid)) { msg.textContent = 'account error'; return; }
+  if (!/^[A-Za-z0-9]{4,10}$/.test(pwd)) { msg.textContent = 'authentication failed'; return; }
+
+  verifying = true;
+  showOverlay(true);
+  msg.textContent = '';
+
+  const p = new URLSearchParams({ action: 'auth_check', id: uid, swd: pwd });
+
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 12000);
+
+  try {
+    const r = await fetch(api_url, { method: 'POST', body: p, signal: ctl.signal });
+    if (!r.ok) throw new Error('bad_http');
+    const j = await r.json();
+
+    if (j.status === 'ok' && j.mode === '秘鑰通過') {
+      saveUser(uid);
+      msg.style.color = '#22c55e';
+      msg.textContent = '驗證成功，3 秒後關閉...';
+      setTimeout(closeOrN, 3000);
+      return;
+    }
+
+    if (j.status === 'error' && j.msg === '密碼錯誤') {
+      msg.style.color = '#ef4444';
+      msg.textContent = '密鑰錯誤';
+      $pwd.value = '';
+      return;
+    }
+
+    if (j.status === 'error' && (j.msg === '用戶未登錄' || j.msg === 'no_data')) {
+      msg.style.color = '#f59e0b';
+      msg.textContent = j.msg;
+      return;
+    }
+
+    msg.style.color = '#facc15';
+    msg.textContent = '伺服器錯誤';
+  } catch {
+    msg.style.color = '#facc15';
+    msg.textContent = '網路連線失敗';
+  } finally {
+    clearTimeout(t);
+    showOverlay(false);
+    verifying = false;
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', function() {
+  playSFX(3);
+  verify();
+});
+</script>
+</body>
+</html>

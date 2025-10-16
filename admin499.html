@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8" />
+<meta charset="utf-8">
+<script src="./config.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>資料庫管理頁</title>
 <style>
@@ -169,11 +170,9 @@
 
 <script>
   // ====== 元件參照 ======
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbz5TXqNou2gdKn1JXEiqTvAGjpwnT0BucbI3HCBkZfgwHH922uvRIwavS8WZYC_6soQ/exec';
-
   const rows = document.getElementById('rows');
   const gasBadge = document.getElementById('gasStatus');
-  const clockEl = document.getElementById('clock');
+  const el = document.getElementById('clock');
   const mask = document.getElementById('mask');
   const idEl = document.getElementById('id');
   const nameEl = document.getElementById('name');
@@ -181,58 +180,19 @@
   const limitEl = document.getElementById('limit');
 
   const rowById = Object.create(null);
-  pingGas();
   let uploadCount = 0;
 
   // ====== 時鐘（台北時區） ======
-  let nowTPE = new Date();
-  function tickClock(){
-    nowTPE = getNowInTPE();
-    clockEl.textContent = formatYMDHMS(nowTPE);
-  }
-  setInterval(tickClock, 1000);
-  tickClock();
-
-  function getNowInTPE(){
-    const now = new Date();
-    const f = new Intl.DateTimeFormat('zh-TW', {
-      timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
-      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
-    });
-    const parts = f.formatToParts(now);
-    const o = Object.fromEntries(parts.map(p=>[p.type,p.value]));
-    return new Date(Date.UTC(+o.year, +o.month-1, +o.day, +o.hour, +o.minute, +o.second));
-  }
-  function formatYMD(dateUTC){
-    const z=n=>String(n).padStart(2,'0');
-    return dateUTC.getUTCFullYear()+'-'+z(dateUTC.getUTCMonth()+1)+'-'+z(dateUTC.getUTCDate());
-  }
-  function formatYMDHMS(dateUTC){
-    const z=n=>String(n).padStart(2,'0');
-    return formatYMD(dateUTC)+' '+z(dateUTC.getUTCHours())+':'+z(dateUTC.getUTCMinutes())+':'+z(dateUTC.getUTCSeconds());
-  }
-
-  // ====== Excel/試算表序號轉換 ======
-  const EXCEL_EPOCH_UTC = Date.UTC(1899,11,30);
-  function serialToYmd(n){
-    if (typeof n!=='number' || !isFinite(n)) return '';
-    const ms = n*86400000 + EXCEL_EPOCH_UTC;
-    const dt = new Date(ms);
-    return formatYMD(new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())));
-  }
-  function baseSerialFromTPE(dateUTC){
-    const y=dateUTC.getUTCFullYear(), m=dateUTC.getUTCMonth(), d=dateUTC.getUTCDate();
-    const baseMs = Date.UTC(y,m,d) - EXCEL_EPOCH_UTC;
-    return Math.floor(baseMs/86400000);
-  }
+function tickClock(){ el.textContent= now;}
 
   // ====== 遮罩 ======
-  function showMask(){ mask.style.display='flex'; }
+  function showMask()
+{ mask.style.display='flex'; }
   function hideMask(){ mask.style.display='none'; }
 
   // ====== GAS 健康檢查（GET） ======
   function pingGas(){
-    fetch(GAS_URL+'?ping=1',{method:'GET',cache:'no-store'})
+    fetch(api_url+'?ping=1',{method:'GET',cache:'no-store'})
       .then(r=>{ if(r.ok){ gasBadge.textContent='OK'; gasBadge.className='badge ok'; } else { gasBadge.textContent='ERR'; gasBadge.className='badge err'; } })
       .catch(_=>{ gasBadge.textContent='ERR'; gasBadge.className='badge err'; });
   }
@@ -240,10 +200,11 @@
 
   // ==== 渲染（0 → 永久；yyyy-mm-dd ====
   function renderTable(values){
+    values.sort((a,b)=> Number(b[2]) - Number(a[2]));
     rows.innerHTML='';
     for(const v of values){
       const id=v[0], name=v[1], tier=v[2], rawLimit=v[3];
-      const ymd = (rawLimit == 0) ? '永久' : serialToYmd(rawLimit);
+      const ymd = (rawLimit == 0) ? '永久' : serialToYMD(rawLimit);
       const tr = document.createElement('tr');
       tr.dataset.id=id;
       tr.innerHTML = `
@@ -271,10 +232,10 @@
     tr.onclick = () => fillForm(p.id, p.name, p.tier, p.ymd);
   }
 
-  // ====== 點列帶入（limit 清空，由使用者輸入數字） ======
+  // ====== 點列帶入（limit 清空） ======
   function fillForm(id,name,tier,_ymd){
-    idEl.value=id||'';
-    nameEl.value=name||'';
+    idEl.value=id;
+    nameEl.value=name;
     tierEl.value=String(tier??3);
     limitEl.value='';
 document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -285,7 +246,7 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
     showMask();
     const params=new URLSearchParams();
     params.append('action','list_recent2');
-    fetch(GAS_URL,{method:'POST',body:params})
+    fetch(api_url,{method:'POST',body:params})
       .then(r=>r.json())
       .then(d=>{ if(d.status==='ok') renderTable(d.values||[]); })
       .catch(console.error)
@@ -296,9 +257,14 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
     limitEl.value='';
   }
 
-  // ====== 上傳（僅 limit>0 計算；空或 0 → 傳空字串） ======
+  // === 上傳（僅 limit>0 計算；0 → 傳空） ===
   function uploadOne(){
+    const uid = localStorage.getItem('user_id');
+    if (!uid) {
+      window.open('verify.html', '_blank');
+      return; }
     const p={
+      uid:uid,
       id:(idEl.value||'').trim().toUpperCase(),
       name:(nameEl.value||'').trim(),
       tier:parseInt(tierEl.value,10),
@@ -311,23 +277,23 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
 
     let limitSerial=''; let ymdShow='';
     if(p.limit!=='' && Number(p.limit)>0){
-      const mins = nowTPE.getUTCHours()*60 + nowTPE.getUTCMinutes();
-      let base = baseSerialFromTPE(new Date(nowTPE));
+      let base = ymdToSerial(now);
       if(mins<500) base = base - 1;
       limitSerial = base + Number(p.limit);
-      ymdShow = serialToYmd(limitSerial);
+      ymdShow = serialToYMD(limitSerial);
       p.tier = 0;
     }
 
     showMask();
-    const form=new URLSearchParams();
-    form.append('action','upsert');
-    form.append('id',p.id);
-    form.append('name',p.name);
-    form.append('tier',String(p.tier));
-    form.append('limit_date',String(limitSerial));
+    const fot=new URLSearchParams();
+    fot.append('action','upsert');
+    fot.append('uid',p.uid);
+    fot.append('id',p.id);
+    fot.append('name',p.name);
+    fot.append('tier',String(p.tier));
+    fot.append('limit_date',String(limitSerial));
 
-    fetch(GAS_URL,{method:'POST',body:form})
+    fetch(api_url,{method:'POST',body:fot})
       .then(r=>r.json())
       .then(resp=>{
         if(resp.status==='ok'){
@@ -342,8 +308,8 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
       .finally(hideMask);
   }
 
-  // ====== 綁定 ======
-  document.getElementById('btnReload').addEventListener('click', reloadData);
+  /* ====== 綁定 ===== */
+document.getElementById('btnReload').addEventListener('click', reloadData);
   document.getElementById('btnUpload').addEventListener('click', uploadOne);
   idEl.addEventListener('input', ()=>{ idEl.value=idEl.value.toUpperCase().replace(/[^A-Z0-9]/g,''); });
   limitEl.addEventListener('input', ()=>{ limitEl.value=limitEl.value.replace(/[^\d]/g,''); });
@@ -351,6 +317,10 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
   // 初始載入
 window.addEventListener('load', () => {
   setTimeout(reloadData, 1000); });
+
+tickClock();
+  setInterval(tickClock, 1000);
+pingGas();
   setInterval(pingGas, 45000);
 </script>
 </body>

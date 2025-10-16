@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<script src="./config.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>D2大夜班跨加報名系統</title>
 <style>
@@ -56,7 +57,7 @@ main{display:block;padding:8px 0 0;overflow:visible;}
   background-repeat:no-repeat;
   background-position:right 8px center;
   background-size:10px 6px;
-  padding-right:26px;
+  padding-right:20px;
   cursor:pointer;
 } 
 /* .mmddsel:focus{outline:2px solid var(--accent)} */
@@ -105,9 +106,14 @@ main{display:block;padding:8px 0 0;overflow:visible;}
   width:100%;max-width:640px;margin:6px auto 0;background:rgba(15,23,42,.8); border:none;border-radius:12px;padding:8px 6px;text-align:center;box-shadow:none; }
 .line{padding:6px 8px;border-bottom:1px dashed #334155;font-size:13px;}
 .line:last-child{border-bottom:0;}
-.draftB .ok { color: #22c55e; }
-.draftB .ng { color: #ef4444; }
-.draftB .on { color: #ffd700; }
+.draftB .ok1 { color: #ea0000; }
+.draftB .ok2 { color: #00db00; }
+.draftB .xd  { color: #ffd700; }
+.draftB .ng  { color: #00ffff; }
+#draftB .line {
+  font-family: monospace;
+  white-space: pre;
+}
 
 /* 底部狀態列 */
 .footerbar{ height:var(--footer-h);position:fixed;left:0;bottom:0;width:100%;display:flex;justify-content:space-between;align-items:center;
@@ -122,6 +128,14 @@ main{display:block;padding:8px 0 0;overflow:visible;}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:999;}
 .spinner{width:50px;height:50px;border-radius:50%;border:4px solid rgba(255,255,255,.3);border-top-color:var(--accent);animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+#toast{
+  position:fixed; left:50%; bottom:40%; transform:translateX(-50%) translateY(8px);
+  padding:10px 16px; border-radius:10px; background:#0b1324cc; color:#e5e7eb;
+  border:1px solid #334155; box-shadow:0 6px 20px rgba(0,0,0,.35);
+  font-weight:700; letter-spacing:.04em; z-index:9999;
+  opacity:0; transition:opacity .2s ease, transform .2s ease; pointer-events:none;
+}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -168,59 +182,31 @@ main{display:block;padding:8px 0 0;overflow:visible;}
     <div class="sitem"><span class="dot" id="dotSs"></span>wb</div>
     <div class="sitem"><span class="dot" id="dotSh"></span>sh1</div>
   </div>
-  <div class="ver">版本：v1.4.9</div>
-  <div class="clock" id="clock">--/-- --:--:--</div>
-</div>
+  <div class="ver">版本：v1.5.7</div>
+  <div class="clock" id="clock">--/-- --:--:--</div></div>
 
   <div class="overlay" id="overlay"><div class="spinner"></div></div>
+
+  <div id="toast"></div>
+
+  <audio id="bgm" src="./mus/clock03.mp3" preload="auto"></audio>
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbz5TXqNou2gdKn1JXEiqTvAGjpwnT0BucbI3HCBkZfgwHH922uvRIwavS8WZYC_6soQ/exec';
-const TZ='Asia/Taipei';
-  let selA='平日', selB='N';
+  bgm.src = './mus/login1.mp3';
+  bgm.load();
+  let lock_st = 0, selA='平日', selB='N';
+  const DAYS = [];
   const cuton =  360; // 換日時間
   const cutoff = 130; // 超時時間
 
-/* ===== 轉 Excel 基準 日期序號===== */
-function ymdToSerial(y,m,d){ return Math.floor(Date.UTC(y,m-1,d)/86400000)+25569; }
-
-/* ===== mm/dd 文字 ===== */
-function mdLabel(y,m,d){ const mm=String(m).padStart(2,'0'), dd=String(d).padStart(2,'0'); return ` » ${mm}/${dd}`; }
-
-/* ===== 時鐘（台北時間）===== */
-function tpeParts(){
-  const p = new Intl.DateTimeFormat('zh-Hant-TW',{ timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
-  }).formatToParts(new Date()).reduce((a,b)=>(a[b.type]=b.value,a),{}); return { y:+p.year, m:+p.month, d:+p.day, h:+p.hour, mi:+p.minute, s:+p.second };
-}
-
-function startClock(){
-  const el=document.getElementById('clock');
-  const tick=()=>{
-    const p=tpeParts();
-    const mm=String(p.m).padStart(2,'0'), dd=String(p.d).padStart(2,'0');
-    const hh=String(p.h).padStart(2,'0'), mi=String(p.mi).padStart(2,'0'), ss=String(p.s).padStart(2,'0');
-    if(el) el.textContent=`${mm}/${dd} ${hh}:${mi}:${ss}`;
-  };
-  tick(); setInterval(tick,1000);
-}
-
-/* ===== 產生 7 天清單並灌入下拉 ===== */
-let lock_st = 0;
-function fillDateSelect(){
-  const sel = document.getElementById('selDate'); if(!sel) return;
-  sel.innerHTML='';
-  let {y,m,d,h,mi}=tpeParts();
-  if (h*60+mi>cuton){ const t=new Date(Date.UTC(y,m-1,d)); t.setUTCDate(t.getUTCDate()+1); y=t.getUTCFullYear(); m=t.getUTCMonth()+1; d=t.getUTCDate(); }
-  for(let i=0;i<7;i++){
-    const t=new Date(Date.UTC(y,m-1,d)); t.setUTCDate(t.getUTCDate()+i);
-    const yy=t.getUTCFullYear(), mm=t.getUTCMonth()+1, dd=t.getUTCDate();
-    const opt=document.createElement('option');
- opt.value=String( ymdToSerial(yy,mm,dd) );
-    opt.textContent=mdLabel(yy,mm,dd);
-    sel.appendChild(opt);
-  }
-  sel.selectedIndex=0;
-  lock_st = 0;
-}
+const box  = document.getElementById('draftBoxB');
+const list = document.getElementById('draftB');
+const sel = document.getElementById('selDate');
+const el=document.getElementById('code');
+const tn=document.getElementById('clock');
+const en=document.getElementById('toast');
+const sendBtn = document.getElementById('sendBtn');
+const aBtns = Array.from(document.querySelectorAll('[data-a]'));
+const bBtns = Array.from(document.querySelectorAll('[data-b]'));
 
 /* ===== 草稿A ===== */
 const DRAFTA_KEY='d2_draft_a_v1';
@@ -228,27 +214,22 @@ function saveA(id){localStorage.setItem(DRAFTA_KEY,id);}
 function loadA(){return localStorage.getItem(DRAFTA_KEY)||'';}
 
 /* ===== 草稿B ===== */
-const DRAFTB_KEY='d2_draft_b_v1';
-function loadB(){try{return JSON.parse(localStorage.getItem(DRAFTB_KEY)||'[]');}catch(_){return[];}}
-function saveB(a){localStorage.setItem(DRAFTB_KEY,JSON.stringify(a.slice(0,15)));} // 最新在上保留15筆
+const DRAFTB_KEY='d2_draft_b_v3';
+let DRAFTB = JSON.parse(localStorage.getItem(DRAFTB_KEY) || '[]');
 
-function addB(item){
-  const arr = loadB();
-  arr.unshift(item);
-  saveB(arr.slice(0,15));
-  renderB();
+function saveB(item){
+  DRAFTB.unshift(item);
+  DRAFTB = DRAFTB.slice(0, 15);
+  localStorage.setItem(DRAFTB_KEY, JSON.stringify(DRAFTB));
+  renderB(DRAFTB);
 }
 
-function renderB(){
-  const box  = document.getElementById('draftBoxB');
-  const list = document.getElementById('draftB');
-  const arr  = loadB();
-  if(!arr.length){ box.style.display='none'; list.innerHTML=''; return; }
+function renderB(arr) {
+  const data = arr;
+  if (!data.length){ box.style.display='none'; list.innerHTML=''; return; }
   box.style.display='block';
-  list.innerHTML = arr.map(x =>
-    `<div class="line ${x.flag}">
-       ${x.ts} | ${x.id} | ${x.a} | ${x.b} | ${x.status}
-     </div>`
+  list.innerHTML = data.map(x =>
+    `<div class="line ${x.flag}">${x.ts} ${x.id} ${x.a} ${x.b} ${x.msg}</div>`
   ).join('');
 }
 
@@ -257,7 +238,7 @@ async function probeStatus(){
   const gas=document.getElementById('dotGas'),ss=document.getElementById('dotSs'),sh=document.getElementById('dotSh');
   const set=(el,c)=>{el.classList.remove('ok','bad');el.classList.add(c);};
   try{
-    const r=await fetch(API_URL+'?target=1',{method:'GET',cache:'no-store'});
+    const r=await fetch(api_url+'?target=1',{method:'GET',cache:'no-store'});
     set(gas,r.ok?'ok':'bad');
     const j=await r.json().catch(()=>null);
     if(j&&j.fileExists)set(ss,'ok');
@@ -265,93 +246,167 @@ async function probeStatus(){
   }catch(_){set(gas,'bad');}
 }
 
+function startClock(){ tn.textContent=now }
+
 /* ===== 傳送 ===== */
 function showOverlay(on){document.getElementById('overlay').style.display=on?'flex':'none';}
 function submitData(p){
   const params=new URLSearchParams();
-  params.append('action','submit');params.append('key',p.key);
-  params.append('date',p.date);params.append('shift',p.shift);
-  params.append('id',p.id);params.append('dN',p.dN);
-  return fetch(API_URL,{method:'POST',body:params,cache:'no-store'})
+  params.append('action','submit');
+  params.append('uid',p.uid);
+  params.append('key',p.key);
+  params.append('date',p.date);
+  params.append('shift',p.shift);
+  params.append('id',p.id);
+  params.append('dN',p.dN);
+  return fetch(api_url,{method:'POST',body:params,cache:'no-store'})
     .then(r=>r.text()).then(t=>{try{return JSON.parse(t);}catch(_){return{status:'parse_failed',raw:t};}});
 }
 
 /* ===== 送出動作 ===== */
 async function send(){
-  const idEl = document.getElementById('code');
-  const id = idEl.value.trim().toUpperCase();
+  const curr = currentS();
+  const uid = localStorage.getItem('user_id');
+  if (!uid) {
+    window.open('verify.html', '_blank');
+    return; }
+  const id = el.value.trim().toUpperCase();
   if(!/^[A-Z0-9]{5}$/.test(id)){
-    idEl.focus();
+    el.focus();
     return;
   }
-  const sel   = document.getElementById('selDate');
-  const ser   = Number(sel.value);
-  const mdTxt = sel.options[sel.selectedIndex].text;
-  const payload = { id, date: ser, key: `${ser}|${id}`, shift: selB, dN: selA };
+  const payload = { id, date: curr.s, key: `${curr.s}|${id}`, shift: selB, dN: selA, uid: uid };
   showOverlay(true);
   let ok=false,res;
   try{ res=await submitData(payload); ok=res&&res.status==='ok'; }
   catch(_){ ok=false; }
   showOverlay(false);
-  let ts='--/-- --:--';
-  const clk=document.getElementById('clock');
-  if(clk && clk.textContent){
-    const m=clk.textContent.match(/^(\d{2}\/\d{2}) (\d{2}:\d{2})/);
-    if(m) ts=`${m[1]} ${m[2]}`;
-  }
+  let ts= now.slice(5, 16);
+
   const status = ok ? 'ok':'ng';
-  const bIsN   = String(selB).toUpperCase()==='N';
-  const flag   = ok ? (bIsN ? 'on':'ok'):'ng';
-  const aDisp  = bIsN ? `${mdTxt} - 取消` : `${mdTxt} - ${selA}`;
-  addB({ ts, id, a: aDisp, b: selB, status, flag });
-  toast(ok ? `已送出（${selA}/${selB}）` : '失敗');
+  const resultText = ok ? '成功' : '失敗';
+  const flag = !ok
+    ? 'ng'
+    : selB === 'N'
+      ? 'xd'
+      : selA === '假日'
+        ? 'ok1'
+        : selA === '平日'
+          ? 'ok2'
+          : 'ok';
+  //const bDisp = selB === 'N' ? '_' : selB;
+  //  const aDisp = `${curr.b} - ${selB === 'N' ? '取消' : selA}`;
+
+  const bDisp = selB === 'N' ? '\u00A0' : selB;
+  const aDisp = `${curr.b} ${selB === 'N' ? '取消' : selA}`;
+  saveB({ ts, id, a: aDisp, b: bDisp, msg:  `${resultText}`, flag });
+  playSFX(0);
+  toast(ok ? `　${aDisp}　` : '送出失敗')
+}
+
+function currentS() {
+  const idx = sel.selectedIndex;
+  const s = sel.options[idx].value;
+  const b = sel.options[idx].textContent;
+  return { s , b };
 }
 
 function checkCutoff(){
-  const clk = document.getElementById('clock');
-  const mt  = clk.textContent.match(/^(\d{2})\/(\d{2}) (\d{2}):(\d{2})/);
-   if(!mt) return;
-   const mins = (+mt[3]) * 60 + (+mt[4]);
-   if (mins > cuton && lock_st === 1) fillDateSelect();
-   if (mins > cutoff && mins < cuton && lock_st === 0) {
-     const sel   = document.getElementById('selDate');
-     if (sel.selectedIndex === 0) sel.selectedIndex = 1;
-     sel.options[0].disabled = true;
-     lock_st = 1;
-   }
+  if (mins >= cuton && lock_st === 1) {
+    fillDateSelect();
+  }
+  if (mins > cutoff && mins < cuton && lock_st === 0) {
+    if (sel.selectedIndex === 0)
+    sel.selectedIndex = 1;
+    sel.options[0].disabled = true;
+    sel.focus();
+    lock_st = 1;
+  }
+}
+
+function toast(msg, duration = 2200){
+  if(!en) return;
+  en.textContent = msg;
+  en.classList.add('show');
+  clearTimeout(en._t);
+  en._t = setTimeout(()=>en.classList.remove('show'), duration);
 }
 
 /* ===== 輸入與選項 ===== */
-function bindInput(){
-  const el=document.getElementById('code');
-  el.value=loadA();
-  el.addEventListener('input',()=>{let x=el.value.replace(/[^A-Za-z0-9]/g,'').slice(0,5);el.value=x.toUpperCase();if(el.value.length===5)saveA(el.value);});
-  el.addEventListener('focus',()=>{if(el.value)el.value='';});
+function onElEvent(e) {
+  if (e.type === 'focus') return (el.value = '');
+  const v = el.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 5);
+  el.value = v;
+  if (v.length === 5) saveA(v);
 }
+
 function setSel(btns,val,attr){
   btns.forEach(b=>{const on=b.dataset[attr]===val;b.classList.toggle('sel',on);b.setAttribute('aria-pressed',on?'true':'false');});
 }
-function enableSend(){document.getElementById('sendBtn').disabled=!(selA&&selB);}
+
+/* ===== 產生 7 天清單並灌入下拉 ===== */
+function fillDateSelect(){
+  let base = ymdToSerial(now);
+  if (mins >= cuton) { base += 1; }
+  DAYS.length = 0;
+  for (let k = 0; k < 7; k++) {
+    const s   = base + k;
+    const ymd = serialToYMD(s);
+    DAYS.push({ ymd, serial: s, label: ymd.slice(5) });
+  }
+  sel.innerHTML = DAYS
+    .map((x,i)=>`<option value="${x.serial}" ${i===0?'selected':''}>${x.label}</option>`)
+    .join('');
+  sel.selectedIndex = 0;
+  sel.focus();
+  lock_st = 0;
+}
+
+function onA(e){ selA = e.currentTarget.dataset.a; setSel(aBtns, selA, 'a'); enableSend(); }
+
+function onB(e){ selB = e.currentTarget.dataset.b; setSel(bBtns, selB, 'b'); enableSend(); }
+
+function enableSend(){ 
+document.getElementById('sendBtn').disabled=!(selA&&selB); }
+
+
+el.addEventListener('focus', onElEvent);
+el.addEventListener('input', onElEvent);
+
+aBtns.forEach(x => 
+  x.addEventListener('click', e => {
+    playSFX(1);
+    onA(e);
+    })
+  );
+bBtns.forEach(x => 
+  x.addEventListener('click', e => {
+    playSFX(1);
+    onB(e);
+    })
+  );
+
+sendBtn.addEventListener('click', () => {
+  playSFX(3);
+  send();
+});
+
+sel.addEventListener('change', () => {
+  playSFX(2);
+});
 
 /* ===== 啟動 ===== */
-addEventListener('DOMContentLoaded', ()=>{
-  setSel(document.querySelectorAll('[data-a]'), selA, 'a');
-  setSel(document.querySelectorAll('[data-b]'), selB, 'b');
-  document.querySelectorAll('[data-a]').forEach(b=>b.addEventListener('click', ()=>{
-    selA = b.dataset.a; setSel(document.querySelectorAll('[data-a]'), selA, 'a'); enableSend();
-  }));
-  document.querySelectorAll('[data-b]').forEach(b=>b.addEventListener('click', ()=>{
-    selB = b.dataset.b; setSel(document.querySelectorAll('[data-b]'), selB, 'b'); enableSend();
-  }));
-  startClock();
-  bindInput();
-  enableSend();
-  probeStatus();
-  renderB();
-  fillDateSelect();
-  checkCutoff();
-    setInterval(checkCutoff, 5*60*1000);   document.getElementById('sendBtn').addEventListener('click', send);
-});
+setSel(aBtns, selA, 'a');
+setSel(bBtns, selB, 'b');
+enableSend();
+fillDateSelect();
+el.value=loadA();
+renderB(DRAFTB);
+probeStatus();
+startClock();
+setInterval(startClock,1000);
+checkCutoff();
+setInterval(checkCutoff, 5 * 60 * 1000);
 </script>
 </body>
 </html>

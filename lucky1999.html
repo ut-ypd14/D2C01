@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
+<script src="./config.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>抽籤執行系統</title>
 <style>
@@ -14,21 +15,87 @@
 }
 html,body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--fg);height:100%;max-width: 480px; margin: 0 auto; }
 body{display:flex;flex-direction:column;overflow:hidden;}
-.top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:#1e293b;border-bottom:1px solid #334155;}
-.clock{font-family:monospace;font-size:1em;}
-.btns{display:flex;gap:6px;}
-.btn:hover{background:#334155;}
-.btn{display:inline-flex;align-items:center;height:28px;padding:0 8px;}
-.select-bar{display:flex;align-items:center;justify-content:center;margin:0;}
-.sel{display:inline-flex;align-items:center;height:28px;line-height:1;padding:0 8px;
-  border: 1px solid #38bdf8; 
-  background: #1e3a8a; 
-  color: #ffffff;    
-  box-shadow: 0 0 6px #38bdf855; 
-  text-shadow: 0 0 4px #38bdf8;
+
+.top{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:6px 12px; height:45px; box-sizing:border-box;
+  background:#1e293b; border-bottom:1px solid #334155;
+
+  /* 防自動放大與換行 */
+  text-size-adjust:none; -webkit-text-size-adjust:none; -moz-text-size-adjust:none;
+  white-space:nowrap; overflow:hidden;
+
+  /* 字型鎖定 */
+  font-size:14px; line-height:1.2; letter-spacing:.02em;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
-.main{flex:1 1 auto;display:flex;flex-direction:column;overflow-y:auto;padding:10px;box-sizing:border-box;}
+
+/* 子項統一行為 + 修復 Firefox 溢出與垂直不齊 */
+.top > *{
+  flex:0 0 auto; font-size:inherit; color:#e5e7eb;
+  display:flex; align-items:center; min-width:0;
+}
+
+/* 狀態燈 */
+.top .status{ gap:6px; }
+.top .dot{ width:10px; height:10px; border-radius:50%; background:#475569; }
+.top .dot.ok{ background:#22c55e; } .top .dot.err{ background:#ef4444; }
+
+/* 時鐘 */
+.top .clock{ font-family:monospace; font-size:12px; line-height:1; color:#94a3b8; }
+
+/* 控制項（btn + sel 共用基底） */
+.top .btn, .top .sel{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:28px; padding:0 10px; line-height:1; border-radius:8px;
+  border:1px solid #334155; background:#1f2937; color:#e5e7eb;
+  transition:background .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.top .btn:hover{ background:#334155; }
+.select-bar{ position:relative; display:flex; align-items:center; }
+.select-bar::after{
+  content:""; position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  width:0; height:0; pointer-events:none;
+  border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #FFD700;
+}
+
+/* 下拉：常態高亮 + 移除原生箭頭 */
+.sel{
+  appearance:none; -webkit-appearance:none; -moz-appearance:none;
+  border:2px solid #00fff7; border-radius:8px;
+  height:28px; padding:0 28px 0 10px;
+  background:#1e3a8a; color:#fff;
+  box-shadow:0 0 8px #00fff7;
+  line-height:1; display:inline-flex; align-items:center;
+}
+.sel::-ms-expand{ display:none; }
+.sel:focus, .sel:focus-visible{
+  outline:none;
+  border-color:#00fff7;
+  box-shadow:0 0 12px #00fff7, 0 0 2px #00fff7 inset;
+}
+
+/* 小螢幕：只收緊間距與尺寸，字級不變 */
+@media (max-width:480px){
+  .top{ gap:6px; padding:6px 8px; }
+  .top .btn, .top .sel{ height:26px; padding:0 8px; }
+  .top .sel{ padding-right:22px; background-size:9px 5px; max-width:260px; }
+}
+
+
+.main{flex:1 1 auto;display:flex;flex-direction:column;overflow-y:auto;padding:25px 10px 12px 10px;box-sizing:border-box;}
 .rows { display:flex; flex-direction: column; box-sizing: border-box; gap: 2px; width: 90%; margin: 0 auto; }
+#rows{
+  width:90%;
+  min-height:480px;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:contain;
+  border-radius:8px;
+  opacity:1;
+  transition:background-image 1s ease-in-out,opacity 1s ease;
+  padding:0px;
+  background-clip:content-box; }
 .group{border-bottom:1px solid #334155;margin-top:8px;padding-bottom:4px }
 .row{border-bottom:1px solid #1e293b; }
 .group, .row {
@@ -61,23 +128,23 @@ body{display:flex;flex-direction:column;overflow:hidden;}
   <!-- 狀態燈 -->
   <div class="status" id="gasStatus">
     <span class="dot" id="gasDot"></span>
-    <span id="gasText">n/a</span>
+    <span id="gasText">GAS</span>
   </div>
 
   <!-- 抽籤按鈕 -->
   <div class="btns">
-    <button class="btn" id="btnDraw">抽籤</button></div>
+    <button class="btn" id="btnDraw">抽　籤</button></div>
 
   <!-- 時間顯示 -->
   <div class="clock" id="nowTime">--/-- --:--:--</div>
 
   <!-- 日期選單 -->
   <div class="select-bar">
-    <select id="daySel" class="sel"></select></div>
+    <select id="daySel" class="sel"></select>  </div>
 
   <!-- 讀表按鈕 -->
   <div class="btns">
-    <button class="btn" id="btnRead">讀表</button></div>
+    <button class="btn" id="btnRead">讀　表</button>  </div>
 </div>
 
 <div class="main">
@@ -86,36 +153,33 @@ body{display:flex;flex-direction:column;overflow:hidden;}
 
 <div id="mask" class="mask">處理中…</div>
 
+<audio id="bgm" src="./mus/clock03.mp3" preload="auto"></audio>
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbz5TXqNou2gdKn1JXEiqTvAGjpwnT0BucbI3HCBkZfgwHH922uvRIwavS8WZYC_6soQ/exec';
-
-/* ===== 時間控制 ===== */
-function nowCorrected(){
-  const p=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour12:false,
-  year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).formatToParts(new Date());
-  const g=t=>Number(p.find(x=>x.type===t).value);
-  return new Date(g('year'),g('month')-1,g('day'),g('hour'),g('minute'),g('second'));
-}
-function ymdToSerial(ymd){
-  const [y,m,d]=ymd.split('-').map(Number);
-  const epoch=Date.UTC(1899,11,30);
-  return Math.floor((Date.UTC(y,m-1,d)-epoch)/86400000);
-}
-function fmtMDfromYMD(ymd){return ymd.slice(5).replace('-','/');}
+// Prontera.mp3
+bgm.src = './mus/Detektiv.mp3';
+bgm.load();
+/* ===== 綁定 ===== */
+const mask=document.getElementById('mask');
+const el = document.getElementById('nowTime');
+const rowsEl = document.getElementById('rows');
 
 /* ===== 日期選單 ===== */
 const daySel=document.getElementById('daySel');
-const T0=nowCorrected();
-const baseYMD=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(T0);
-const DAYS=Array.from({length:7},(_,k)=>{
-  const d=new Date(T0.getFullYear(),T0.getMonth(),T0.getDate()+k);
-  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
-  const ymd=`${y}-${m}-${dd}`;
-  return{ymd,serial:ymdToSerial(ymd),label:fmtMDfromYMD(ymd)};
+const base = ymdToSerial(now);
+const DAYS = Array.from({ length:7 }, (_, k) => {
+  const s = base + k
+  const ymd = serialToYMD(s);
+  return {
+    ymd,
+    serial: s,
+    label:ymd.slice(5)
+  };
 });
 daySel.innerHTML=DAYS.map((x,i)=>`<option value="${x.serial}"${i===0?' selected':''}>${x.label}</option>`).join('');
-function currentSerial(){return Number(daySel.value);}
-function currentMD(){const hit=DAYS.find(x=>x.serial===currentSerial());return hit?hit.label:'--/--';}
+
+let currS = null;
+function currentS() {
+  return Number(daySel.value); }
 
 /* ===== 狀態顯示 ===== */
 const gasDot  = document.getElementById('gasDot');
@@ -123,31 +187,19 @@ const gasText = document.getElementById('gasText');
 
 function setGas(status){
   if(!gasDot || !gasText) return;
-  gasDot.className = 'dot' + (status==='GAS' ? ' ok' : status==='GG' ? ' err' : '');
+  gasDot.className = 'dot' + (status==='GAS' ? ' ok' : status==='ng' ? ' err' : '');
   gasText.textContent = status;
 }
 setGas('n/a');
 async function pingGas(){
   try{
-    const res = await fetch(API_URL + '?target=ping', { cache:'no-store' });
+    const res = await fetch(api_url + '?target=ping', { cache:'no-store' });
     const j = await res.json();
     setGas(j.status === 'ok' ? 'GAS' : 'GG');
   }catch(e){
     setGas('GG');
   }
 }
-
-/* ===== 即時時間顯示 ===== */
-function tick(){
-  const t=nowCorrected();
-  const s=`${String(t.getMonth()+1).padStart(2,'0')}/${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-  document.getElementById('nowTime').textContent=s;
-}
-
-/* ===== 遮罩控制 ===== */
-const mask=document.getElementById('mask');
-function showMask(t){mask.textContent=t;mask.classList.add('show');}
-function hideMask(){mask.classList.remove('show');}
 
 /* ===== 資料解析 ===== */
 function parseLuckyData(data){
@@ -160,16 +212,13 @@ function parseLuckyData(data){
 /* ===== 資料渲染 ===== */
 function renderResponse(j){
   const list = parseLuckyData(j);
-  const serial = currentSerial();
-  const rows = list
-  .filter(r => Number(r.date) === serial)
-  .filter(r => ['A','B'].includes(String(r.shift || '').toUpperCase()))
-  .filter(r => Number(r.tier) < 3000);
+  const rows = list.filter(r =>
+  Number(r.date) === currS && ['A','B'].includes(r.shift.toUpperCase()) && Number(r.tier) > 0 && Number(r.tier) < 3000).sort((a, b) => Number(a.tier) - Number(b.tier));
 
   const A=[], B=[];
   rows.forEach(r => (String(r.shift).toUpperCase()==='A' ? A : B).push(r));
 
-  const rowsEl = document.getElementById('rows');
+  BgCycle('stop'); // 背景圖關閉 
   rowsEl.innerHTML = '';
   const frag = document.createDocumentFragment();
   frag.appendChild(group('_A','a'));
@@ -202,19 +251,19 @@ function group(t,cls){
 /* ===== 點擊高亮 ===== */
 document.addEventListener('click', e=>{
   const row = e.target.closest('.row');
-  if (!row) return;
-  document.querySelectorAll('.row.selected').forEach(r=>r.classList.remove('selected'));
+  if (!row) return; document.querySelectorAll('.row.selected').forEach(r=>r.classList.remove('selected'));
   row.classList.add('selected');
 });
 
 /* ===== 通訊 ===== */
 async function reloadData(){
   showMask('讀取中…');
+  currS = currentS();
   try{
     const p=new URLSearchParams();
     p.append('action','list_recent');
-    p.append('dateSerial',currentSerial());
-    const r=await fetch(API_URL,{method:'POST',body:p});
+    p.append('dateSerial',currS);
+    const r=await fetch(api_url,{method:'POST',body:p});
     const j=await r.json();
     renderResponse(j);
   }catch(e){showMask('讀取失敗');setTimeout(hideMask,1500);}
@@ -222,11 +271,17 @@ async function reloadData(){
 }
 async function draw(){
   showMask('抽籤中…');
+  currS = currentS();
+  const uid = localStorage.getItem('user_id');
+  if (!uid) {
+    window.open('verify.html', '_blank');
+    return; }
   try{
     const p=new URLSearchParams();
     p.append('action','lucky');
-    p.append('dateSerial',currentSerial());
-    const r=await fetch(API_URL,{method:'POST',body:p});
+    p.append('uid',uid);
+    p.append('dateSerial',currS);
+    const r=await fetch(api_url,{method:'POST',body:p});
     const j=await r.json();
     renderResponse(j);
     showMask('抽籤完成');
@@ -234,15 +289,63 @@ async function draw(){
   }catch(e){showMask('抽籤失敗');setTimeout(hideMask,1500);}
 }
 
-/* ===== 綁定 ===== */
-document.getElementById('btnRead').onclick=reloadData;
-document.getElementById('btnDraw').onclick=draw;
+/* ===== 即時時間顯示 ===== */
+function tickN() {
+el.textContent=now.slice(5); }
+
+/* ===== 遮罩控制 ===== */
+function showMask(t){mask.textContent=t;mask.classList.add('show'); }
+function hideMask(){mask.classList.remove('show');}
+
+
+// === 背景圖片清單 ===
+const IMG_BASE = "https://cdn.imgchest.com/files/";
+const BG_LIST = [
+  "b9c23f4e91c6.jpg",
+  "31e59810dff0.jpg",
+  "73e52af2314c.jpg",
+  "45cea37d2076.jpg",
+  "2e6887215309.jpg",
+  "35864c4b541c.jpg"
+];
+const BG_URLS = BG_LIST.map(name => `${IMG_BASE}${name}`);
+
+let prevIdx = -1;
+const bg_n = BG_URLS.length;
+function cycleBG() {
+  let idx;
+  do {
+    idx = Math.floor(Math.random() * bg_n);
+} while (idx === prevIdx);
+  prevIdx = idx;
+  rowsEl.style.backgroundImage = `url('${BG_URLS[idx]}')`;
+}
+// 啟動背景循環（例如每 15 秒換一張）
+let bgTimer = null;
+function BgCycle(state) {
+  if (state === 'stop') {
+    clearInterval(bgTimer);
+    rowsEl.style.backgroundImage = 'none';
+  } 
+  else if (state === 'start') {
+    cycleBG();
+    bgTimer = setInterval(cycleBG, 15000);
+  }
+}
 
 /* ===== 初始化 ===== */
-  tick();
-    setInterval(tick,1000);
+  tickN();
+    setInterval(tickN,1000);
   pingGas();
     setInterval(pingGas, 45000);
+  BgCycle('start');
+
+daySel.addEventListener('change', () => {
+  playSFX(2);
+});
+
+document.getElementById('btnRead').onclick=reloadData;
+document.getElementById('btnDraw').onclick=draw;
 // document.addEventListener('DOMContentLoaded', reloadData);
 </script>
 </body>

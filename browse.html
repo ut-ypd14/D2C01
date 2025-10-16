@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"/>
+<meta charset="utf-8">
+<script src="./config.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>D2｜名單瀏覽</title>
 <style>
@@ -17,7 +18,10 @@ h1{margin:6px 0 8px;font-size:18px;letter-spacing:.08em;color:var(--accent);text
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .card{background:#0b1324;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .card h3{margin:0;padding:6px 8px;font-size:13px;color:#c7d2fe;border-bottom:1px solid var(--line);text-align:center}
-.table{max-height:48vh;overflow:auto}
+//.table{max-height:48vh;overflow:auto}
+//.table { overflow: visible; }
+.table{ overflow-y: visible;
+max-height:unset; }
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:8px 10px;border-bottom:1px dashed #1f2a44;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 th{position:sticky;top:0;background:#0b1324;color:var(--sub)}
@@ -55,58 +59,58 @@ th{position:sticky;top:0;background:#0b1324;color:var(--sub)}
   </div>
 
 <script>
-/* ===== 常數 ===== */
-const API_URL = 'https://script.google.com/macros/s/AKfycbz5TXqNou2gdKn1JXEiqTvAGjpwnT0BucbI3HCBkZfgwHH922uvRIwavS8WZYC_6soQ/exec';
-
-/* ===== 工具 ===== */
-const pad=n=>String(n).padStart(2,'0');
-const nowTPE=()=>new Date(Date.now()+8*60*60*1000);
-const mdFromSerial=s=>{const t=new Date((s-25569)*86400000);return `${pad(t.getUTCMonth()+1)}/${pad(t.getUTCDate())}`};
-
 /* ===== POST：URLSearchParams ===== */
-async function fetchList(payload){
-  const body = new URLSearchParams(payload);
-
-  const res = await fetch(API_URL, {
+async function fetchList(){
+  const params = new URLSearchParams();
+  params.append('action', 'list_recent');
+  const res = await fetch(api_url, {
     method: 'POST',
-    body: body
+    body: params,
+    cache: 'no-store'
   });
+
   const j = await res.json();
   if (!j || j.status !== 'ok' || !Array.isArray(j.fields) || !Array.isArray(j.values))
     return { rows: [] };
 
   const F = Object.fromEntries(j.fields.map((k, i) => [k, i]));
   const rows = j.values.map(a => ({
-    submittedAt: a[F.submittedAt],
-    key:         a[F.key],
-    date:        Number(a[F.date]),
-    id:          a[F.id],
-    shift:       a[F.shift],
-    dN:          a[F.dN],
-    admin_id:    a[F.admin_id],
-    deletedAt:   a[F.deletedAt],
-    lucky:       a[F.lucky],
-    row:         a[F.row]
+    key: a[F.key],
+    date: Number(a[F.date]),
+    id: a[F.id],
+    shift: a[F.shift],
+    dN: a[F.dN],
+    name: a[F.name]
   }));
   return { rows };
 }
 
-/* ===== 依{資料}→ 拆 A/B → 配對 ===== */
 function splitDays(rows){
-  const n = 7;
-  const dates = [];
-  for (const r of rows){
-    if (!dates.includes(r.date)){
-      dates.push(r.date);
-      if (dates.length === n) break;
-    }
-  }
-  return dates.map(dSer => {
-    const subset = rows.filter(x => x.date === dSer);
+  const N = 8;
+  const minSerial = ymdToSerial(now);
+  const buckets = new Map();
+
+  for (const r of rows) {
+    const d = Number(r.date) || 0;
+    if (d < minSerial) continue;
+    if (!buckets.has(d)) buckets.set(d, []);
+    buckets.get(d).push(r);
+}
+
+  const dates = [...buckets.keys()].sort((a, b) => a - b).slice(0, N);
+
+  const sortRow = (a,b)=>{
+    const d = String(b.dN||'').localeCompare(String(a.dN||''));
+    if(d!==0) return d;
+    return String(a.id||'').localeCompare(String(b.id||''), 'en', {numeric:true, sensitivity:'base'});
+  };
+
+  return dates.map(dSer=>{
+    const subset = buckets.get(dSer).slice().sort(sortRow);
     return {
       date: dSer,
-      A: subset.filter(x => x.shift === 'A').map(x => ({ id:x.id, dN:x.dN })),
-      B: subset.filter(x => x.shift === 'B').map(x => ({ id:x.id, dN:x.dN }))
+      A: subset.filter(x=>String(x.shift).toUpperCase()==='A').map(x=>({id:x.id,name:/^[A-Za-z0-9]+$/.test(x.name) ? '' : x.name,dN:x.dN})),
+      B: subset.filter(x=>String(x.shift).toUpperCase()==='B').map(x=>({id:x.id,name:/^[A-Za-z0-9]+$/.test(x.name) ? '' : x.name,dN:x.dN}))
     };
   });
 }
@@ -122,7 +126,7 @@ function render(groups){
   root.innerHTML = groups.map(g => sectionHTML(g)).join('');
 
   function sectionHTML(g){
-    const title = `日期：${mdFromSerial(g.date)}`;
+    const title = `日期：${serialToMD(g.date)}`;
     const total = (g.A?.length||0) + (g.B?.length||0);
     return `
       <div class="section">
@@ -138,15 +142,15 @@ function render(groups){
   }
   function card(h3, list){
     if (!list || !list.length){
-      return `<div class="card"><h3>${h3}</h3><div class="empty">本日無資料</div></div>`;
+      return `<div class="card"><div class="empty">本日無資料</div></div>`;
     }
-    const rows = list.map(r => `<tr><td>${esc(r.id)}</td><td>${esc(r.dN)}</td></tr>`).join('');
+    const rows = list.map(r => `<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.dN)}</td></tr>`).join('');
     return `
       <div class="card">
-        <h3>${h3}</h3>
+
         <div class="table">
           <table>
-            <thead><tr><th>ID</th><th>假別</th></tr></thead>
+
             <tbody>${rows}</tbody>
           </table>
         </div>
@@ -156,26 +160,28 @@ function render(groups){
 }
 
 /* ===== 流程 ===== */
-async function loadData(payload){
+async function loadData(){
   document.getElementById('loading').classList.remove('hidden');
   document.getElementById('box').classList.add('hidden');
 
-  let rows=[];
-  try{ const {rows:r}=await fetchList(payload); rows=r.slice(0,520); }catch(_){ rows=[]; }
+  let rows = [];
+  try {
+    const { rows: r } = await fetchList();
+    rows = r;
+  } catch (_) {
+    rows = [];
+  }
 
   const groups = splitDays(rows);
   render(groups);
-
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('box').classList.remove('hidden');
 
-  const d=nowTPE(); document.getElementById('ut').textContent=`${pad(d.getUTCMonth()+1)}/${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+document.getElementById('ut').textContent=now
 }
 
-/* ===== 首次與刷新（參數你可改）===== */
-const DEFAULT_PAYLOAD = { action:'list_recent3' };
-document.getElementById('reload').addEventListener('click',()=>loadData(DEFAULT_PAYLOAD));
-loadData(DEFAULT_PAYLOAD);
+document.getElementById('reload').addEventListener('click',()=>loadData());
+loadData();
 </script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<script src="./config.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RAW 檢視（不排序不篩選不分組）</title>
 <style>
@@ -18,13 +19,11 @@
 <div id="root"></div>
 
 <script>
-const API_BASE =  'https://script.google.com/macros/s/AKfycbz5TXqNou2gdKn1JXEiqTvAGjpwnT0BucbI3HCBkZfgwHH922uvRIwavS8WZYC_6soQ/exec';
-
 async function loadRaw(){
   const status = document.getElementById('status');
   const root = document.getElementById('root');
   try{
-    const res = await fetch(API_BASE, { method:"POST", body:new URLSearchParams({action:"list_recent2"}) });
+    const res = await fetch(api_url, { method:"POST", body:new URLSearchParams({action:"list_recent"}) });
     if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
     const data = await res.json();
     if (data?.status !== "ok" || !Array.isArray(data.fields) || !Array.isArray(data.values)){
