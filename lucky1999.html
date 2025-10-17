@@ -272,7 +272,7 @@ async function reloadData(){
 async function draw(){
   showMask('抽籤中…');
   currS = currentS();
-  const uid = localStorage.getItem('user_id');
+  const uid = localStorage.getItem('user_id2');
   if (!uid) {
     window.open('verify.html', '_blank');
     return; }
