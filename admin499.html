@@ -188,7 +188,7 @@ function tickClock(){ el.textContent= now;}
   // ====== 遮罩 ======
   function showMask()
 { mask.style.display='flex'; }
-  function hideMask(){ mask.style.display='none'; }
+  function hideMask() { mask.style.display='none'; }
 
   // ====== GAS 健康檢查（GET） ======
   function pingGas(){
@@ -303,7 +303,6 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
           pushEnd({id:p.id,name:p.name,tier:p.tier,ymd: ymdShow});
           uploadCount++;
 //if(uploadCount>=10){ uploadCount=0; setTimeout(reloadData, 1000); }
-          playSFX(0);
           idEl.value=''; nameEl.value=''; tierEl.value='3'; limitEl.value='';
         }else{
           alert(resp.msg||'上傳失敗');
@@ -311,6 +310,7 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
       })
       .catch(e=>{ console.error(e); alert('上傳錯誤'); })
       .finally(hideMask);
+    playSFX(0);
   }
 
   /* ====== 綁定 ===== */
