@@ -304,13 +304,13 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
           uploadCount++;
 //if(uploadCount>=10){ uploadCount=0; setTimeout(reloadData, 1000); }
           idEl.value=''; nameEl.value=''; tierEl.value='3'; limitEl.value='';
+          playSFX(0);
         }else{
           alert(resp.msg||'上傳失敗');
         }
       })
       .catch(e=>{ console.error(e); alert('上傳錯誤'); })
       .finally(hideMask);
-    playSFX(0);
   }
 
   /* ====== 綁定 ===== */
