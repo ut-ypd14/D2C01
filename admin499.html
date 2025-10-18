@@ -219,7 +219,7 @@ function tickClock(){ el.textContent= now;}
   }
 
 /* 附加或替換至表頭（樂觀更新） */
-  function appendOrReplaceBottom(p){
+  function pushEnd(p){
     const old=rowById[p.id]; if(old) old.remove();
     const tr=document.createElement('tr');
     tr.innerHTML = `
@@ -300,8 +300,10 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
       .then(r=>r.json())
       .then(resp=>{
         if(resp.status==='ok'){
-          appendOrReplaceBottom({id:p.id,name:p.name,tier:p.tier,ymd: ymdShow});
-          uploadCount++; if(uploadCount>=10){ uploadCount=0; setTimeout(reloadData, 1000); }
+          pushEnd({id:p.id,name:p.name,tier:p.tier,ymd: ymdShow});
+          uploadCount++;
+//if(uploadCount>=10){ uploadCount=0; setTimeout(reloadData, 1000); }
+          playSFX(0);
           idEl.value=''; nameEl.value=''; tierEl.value='3'; limitEl.value='';
         }else{
           alert(resp.msg||'上傳失敗');
