@@ -285,7 +285,7 @@ async function send(){
   let ok=false,res;
   try {
     res = await submitData(payload);
-    if (res?.status === 'error') {
+    if (res?.status === 'errorPW') {
       localStorage.removeItem('user_id3');
       showOverlay(false);
       window.open('verify.html','_blank');
