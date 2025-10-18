@@ -291,6 +291,7 @@ async function draw(){
 
     if (j && j.status === 'ok') {
       renderResponse(j);
+      playSFX(0);
       showMask('抽籤完成');
     } else {
       showMask('❌ 抽籤失敗：' + (j.msg ||'未知錯誤'));
