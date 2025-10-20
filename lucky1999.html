@@ -290,6 +290,12 @@ async function draw(){
     const r = await fetch(api_url, { method:'POST', body:p });
     const j = await r.json();
 
+    if (j.status === 'errPW') {
+      localStorage.removeItem('user_id3');
+      hideMask();
+      window.open('verify.html','_blank');
+      return;
+    }
     if (j && j.status === 'ok') {
       renderResponse(j);
       showMask('抽籤完成');
@@ -298,12 +304,6 @@ async function draw(){
       showMask('❌ 抽籤失敗：' + (j.msg ||'未知錯誤'));
     }
     setTimeout(hideMask, 1200);
-    if (j.status === 'errPW') {
-      localStorage.removeItem('user_id3');
-      showOverlay(false);
-      window.open('verify.html','_blank');
-      return;
-    }
   } catch(e) {
     showMask('❌ 連線或解析失敗');
     setTimeout(hideMask, 1500);
