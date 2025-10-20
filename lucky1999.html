@@ -281,7 +281,6 @@ async function draw(){
   }
   showMask('抽籤中…');
   try {
-    const pwd = localStorage.getItem('user_ps3');
     const p = new URLSearchParams();
     p.append('action','lucky');
     p.append('uid', uid);
@@ -299,6 +298,12 @@ async function draw(){
       showMask('❌ 抽籤失敗：' + (j.msg ||'未知錯誤'));
     }
     setTimeout(hideMask, 1200);
+    if (j.status === 'errPW') {
+      localStorage.removeItem('user_id3');
+      showOverlay(false);
+      window.open('verify.html','_blank');
+      return;
+    }
   } catch(e) {
     showMask('❌ 連線或解析失敗');
     setTimeout(hideMask, 1500);
