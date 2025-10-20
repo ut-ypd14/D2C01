@@ -301,8 +301,15 @@ document.querySelector('.bottom').scrollIntoView({behavior:'smooth',block:'neare
     fetch(api_url,{method:'POST',body:fot})
       .then(r=>r.json())
       .then(resp=>{
-        if(resp.status==='ok'){
-          pushEnd({id:p.id,name:p.name,tier:p.tier,ymd: ymdShow});
+        if (resp.status === 'errPW') {
+localStorage.removeItem('user_id3');
+hideMask();
+window.open('verify.html','_blank');
+return;
+        }
+
+        if(resp.status==='ok') {
+pushEnd({id:p.id,name:p.name,tier:p.tier,ymd: ymdShow});
           uploadCount++;
 //if(uploadCount>=10){ uploadCount=0; setTimeout(reloadData, 1000); }
           idEl.value=''; nameEl.value=''; tierEl.value='3'; limitEl.value='';
